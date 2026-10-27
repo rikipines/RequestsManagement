@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RequestsManagement.Tests/RequestsManagement.Tests.csproj" />
+  <Project Path="RequestsManagement/RequestsManagement.csproj" />
+</Solution>

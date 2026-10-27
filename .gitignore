@@ -1,0 +1,25 @@
+# .NET
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Angular / Node
+**/node_modules/
+**/dist/
+**/.angular/
+**/coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Local database
+*.mdf
+*.ldf
+
+# Local settings and secrets
+**/appsettings.Development.json
+**/.env
+**/.env.*

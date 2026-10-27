@@ -1,0 +1,591 @@
+<div class="app-shell" dir="rtl">
+
+  <mat-toolbar class="topbar">
+    <div class="brand">
+      <mat-icon>assignment</mat-icon>
+      <span>מערכת ניהול פניות</span>
+    </div>
+
+    <span class="toolbar-spacer"></span>
+    <span class="toolbar-subtitle">לוח בקרה ארגוני</span>
+  </mat-toolbar>
+
+  <main class="main-content">
+
+    <!-- כותרת העמוד -->
+    <header class="page-header">
+      <div>
+        <h1>ניהול פניות</h1>
+        <p>צפייה, סינון ועדכון פניות במערכת</p>
+      </div>
+
+      <button
+        mat-stroked-button
+        (click)="refreshAll()"
+        [disabled]="loading">
+        <mat-icon>refresh</mat-icon>
+        רענון נתונים
+      </button>
+    </header>
+
+    <!-- כרטיסיות סטטיסטיקה -->
+    <section class="stats-grid" aria-label="סטטיסטיקות פניות">
+
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-icon blue">
+            <mat-icon>description</mat-icon>
+          </div>
+          <span class="stat-label">סה״כ פניות</span>
+          <strong>
+            {{ statisticsLoading ? '...' :
+               (statistics?.totalRequests ?? '—') }}
+          </strong>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-icon purple">
+            <mat-icon>fiber_new</mat-icon>
+          </div>
+          <span class="stat-label">פניות חדשות</span>
+          <strong>
+            {{ statisticsLoading ? '...' :
+               (statistics ? getStatusCount(RequestStatus.New) : '—') }}
+          </strong>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-icon orange">
+            <mat-icon>pending_actions</mat-icon>
+          </div>
+          <span class="stat-label">בטיפול</span>
+          <strong>
+            {{ statisticsLoading ? '...' :
+               (statistics ? getStatusCount(RequestStatus.InProgress) : '—') }}
+          </strong>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-icon green">
+            <mat-icon>task_alt</mat-icon>
+          </div>
+          <span class="stat-label">הושלמו</span>
+          <strong>
+            {{ statisticsLoading ? '...' :
+               (statistics ? getStatusCount(RequestStatus.Completed) : '—') }}
+          </strong>
+        </mat-card-content>
+      </mat-card>
+
+    </section>
+
+    <!-- כרטיס הטבלה הראשית -->
+    <mat-card class="content-card">
+      <mat-card-content>
+
+        <div class="section-header">
+          <div>
+            <h2>רשימת פניות</h2>
+            <p>חיפוש וסינון מתוך כלל הפניות במערכת</p>
+          </div>
+
+          <span class="results-count">
+            {{ totalCount | number }} תוצאות
+          </span>
+        </div>
+
+        <!-- סינונים -->
+        <div class="filters">
+
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>חיפוש חופשי</mat-label>
+            <mat-icon matPrefix>search</mat-icon>
+            <input
+              matInput
+              [ngModel]="searchText"
+              (ngModelChange)="onSearchChange($event)"
+              placeholder="חיפוש לפי כותרת או ארגון">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>סטטוס</mat-label>
+            <mat-select
+              [(ngModel)]="selectedStatus"
+              (selectionChange)="applyFilters()">
+
+              <mat-option [value]="undefined">
+                כל הסטטוסים
+              </mat-option>
+
+              @for (status of statuses; track status.value) {
+                <mat-option [value]="status.value">
+                  {{ status.label }}
+                </mat-option>
+              }
+
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>עדיפות</mat-label>
+            <mat-select
+              [(ngModel)]="selectedPriority"
+              (selectionChange)="applyFilters()">
+
+              <mat-option [value]="undefined">
+                כל העדיפויות
+              </mat-option>
+
+              @for (priority of priorities; track priority.value) {
+                <mat-option [value]="priority.value">
+                  {{ priority.label }}
+                </mat-option>
+              }
+
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>אחראי</mat-label>
+            <input
+              matInput
+              [(ngModel)]="selectedAssignedTo"
+              (keyup.enter)="applyFilters()"
+              placeholder="שם אחראי">
+
+            <button
+              mat-icon-button
+              matSuffix
+              type="button"
+              (click)="applyFilters()"
+              aria-label="סינון לפי אחראי">
+              <mat-icon>search</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <button mat-button (click)="clearFilters()">
+            <mat-icon>filter_alt_off</mat-icon>
+            ניקוי סינונים
+          </button>
+
+        </div>
+
+        <!-- בחירת כל הפניות שעונות לסינון -->
+        @if (totalCount > 0) {
+          <div class="select-all-filtered">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="toggleAllMatching()">
+
+              <mat-icon>
+                {{ selectAllMatching ? 'check_circle' : 'select_all' }}
+              </mat-icon>
+
+              {{ selectAllMatching
+                  ? 'ביטול בחירת כל הפניות'
+                  : 'בחירת כל ' + (totalCount | number) + ' הפניות' }}
+            </button>
+          </div>
+        }
+
+        <!-- עדכון מרובה של פניות שנבחרו -->
+    @if (selectedIds.size > 0 || selectAllMatching) {
+          <div class="bulk-bar">
+
+           <strong>
+  {{ selectAllMatching ? (totalCount | number) : (selectedIds.size | number) }}
+  פניות נבחרו
+</strong>
+
+            <mat-form-field appearance="outline">
+              <mat-label>סטטוס חדש</mat-label>
+
+              <mat-select [(ngModel)]="selectedBulkStatus">
+                @for (status of statuses; track status.value) {
+                  <mat-option [value]="status.value">
+                    {{ status.label }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <button
+              mat-flat-button
+              (click)="bulkUpdate()"
+              [disabled]="updating || selectedBulkStatus === undefined">
+              עדכון פניות
+            </button>
+
+          </div>
+        }
+
+        <!-- טעינה, שגיאה, מצב ריק או טבלה -->
+        @if (loading) {
+
+          <div class="state-container">
+            <mat-spinner diameter="42"></mat-spinner>
+            <p>טוען פניות...</p>
+          </div>
+
+        } @else if (errorMessage) {
+
+          <div class="state-container error-state">
+            <mat-icon>error_outline</mat-icon>
+            <p>{{ errorMessage }}</p>
+
+            <button
+              mat-stroked-button
+              (click)="loadRequests()">
+              נסי שוב
+            </button>
+          </div>
+
+        } @else if (requests.length === 0) {
+
+          <div class="state-container">
+            <mat-icon>inbox</mat-icon>
+            <h3>לא נמצאו פניות</h3>
+            <p>נסי לשנות את תנאי החיפוש או הסינון</p>
+          </div>
+
+        } @else {
+
+          <div class="table-container">
+
+            <table
+              mat-table
+              [dataSource]="requests"
+              matSort
+              [matSortActive]="sortBy"
+              [matSortDirection]="sortDirection"
+              matSortDisableClear
+              (matSortChange)="onSortChange($event)">
+
+              <!-- בחירת פניות -->
+              <ng-container matColumnDef="select">
+
+                <th mat-header-cell *matHeaderCellDef>
+                  <mat-checkbox
+[checked]="selectAllMatching || isAllSelected()"                    (change)="toggleAll($event.checked)"
+                    aria-label="בחירת כל הפניות בעמוד">
+                  </mat-checkbox>
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  <mat-checkbox
+[checked]="selectAllMatching || isSelected(request.id)"                    (change)="toggleSelection(request.id, $event.checked)"
+                    aria-label="בחירת פנייה">
+                  </mat-checkbox>
+                </td>
+
+              </ng-container>
+
+              <!-- מספר פנייה -->
+              <ng-container matColumnDef="id">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="Id">
+                  מספר
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  #{{ request.id }}
+                </td>
+
+              </ng-container>
+
+              <!-- נושא הפנייה -->
+              <ng-container matColumnDef="title">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="Title">
+                  נושא הפנייה
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  <strong class="request-title">
+                    {{ request.title }}
+                  </strong>
+                </td>
+
+              </ng-container>
+
+              <!-- ארגון -->
+              <ng-container matColumnDef="organizationName">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="OrganizationName">
+                  ארגון
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  {{ request.organizationName }}
+                </td>
+
+              </ng-container>
+
+              <!-- עדיפות -->
+              <ng-container matColumnDef="priority">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="Priority">
+                  עדיפות
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  <span
+                    class="priority-badge"
+                    [class.high]="request.priority === RequestPriority.High"
+                    [class.medium]="request.priority === RequestPriority.Medium"
+                    [class.low]="request.priority === RequestPriority.Low">
+
+                    {{ getPriorityLabel(request.priority) }}
+
+                  </span>
+                </td>
+
+              </ng-container>
+
+              <!-- סטטוס -->
+              <ng-container matColumnDef="status">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="Status">
+                  סטטוס
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  <span
+                    class="status-badge"
+                    [class.new]="request.status === RequestStatus.New"
+                    [class.in-progress]="request.status === RequestStatus.InProgress"
+                    [class.waiting]="request.status === RequestStatus.Waiting"
+                    [class.completed]="request.status === RequestStatus.Completed">
+
+                    {{ getStatusLabel(request.status) }}
+
+                  </span>
+                </td>
+
+              </ng-container>
+
+              <!-- אחראי -->
+              <ng-container matColumnDef="assignedTo">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="AssignedTo">
+                  אחראי
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  {{ request.assignedTo || 'לא משויך' }}
+                </td>
+
+              </ng-container>
+
+              <!-- תאריך יצירה -->
+              <ng-container matColumnDef="createdAt">
+
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header="CreatedAt">
+                  תאריך יצירה
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+                  {{ request.createdAt | date:'dd/MM/yyyy' }}
+                </td>
+
+              </ng-container>
+
+              <!-- פעולות -->
+              <ng-container matColumnDef="actions">
+
+                <th mat-header-cell *matHeaderCellDef>
+                  פעולות
+                </th>
+
+                <td mat-cell *matCellDef="let request">
+
+                  <div class="row-actions">
+
+                    <mat-form-field
+                      appearance="outline"
+                      class="inline-status">
+
+                      <mat-select
+                        [value]="request.status"
+                        [disabled]="updating"
+                        (selectionChange)="updateStatus(request, $event.value)"
+                        aria-label="עדכון סטטוס">
+
+                        @for (status of statuses; track status.value) {
+                          <mat-option [value]="status.value">
+                            {{ status.label }}
+                          </mat-option>
+                        }
+
+                      </mat-select>
+
+                    </mat-form-field>
+
+                    <button
+                      mat-icon-button
+                      (click)="openHistory(request)"
+                      aria-label="צפייה בהיסטוריית פנייה"
+                      title="היסטוריה">
+                      <mat-icon>history</mat-icon>
+                    </button>
+
+                  </div>
+
+                </td>
+
+              </ng-container>
+              <!-- שורות הטבלה -->
+              <tr
+                mat-header-row
+                *matHeaderRowDef="columns">
+              </tr>
+
+              <tr
+                mat-row
+                *matRowDef="let row; columns: columns">
+              </tr>
+
+            </table>
+
+          </div>
+
+        }
+
+        <!-- דפדוף -->
+        <mat-paginator
+          [length]="totalCount"
+          [pageIndex]="pageNumber - 1"
+          [pageSize]="pageSize"
+          [pageSizeOptions]="[10, 20, 50]"
+          [showFirstLastButtons]="true"
+          (page)="onPageChange($event)">
+        </mat-paginator>
+
+      </mat-card-content>
+    </mat-card>
+
+    <!-- חלונית היסטוריית פנייה -->
+    @if (selectedRequest) {
+
+      <div
+        class="history-overlay"
+        role="presentation"
+        (click)="closeHistory()">
+
+        <div
+          class="history-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="היסטוריית פנייה"
+          (click)="$event.stopPropagation()">
+
+          <mat-card class="history-card">
+            <mat-card-content>
+
+              <div class="section-header">
+
+                <div>
+                  <h2>
+                    היסטוריית פנייה #{{ selectedRequest.id }}
+                  </h2>
+                  <p>{{ selectedRequest.title }}</p>
+                </div>
+
+                <button
+                  mat-icon-button
+                  (click)="closeHistory()"
+                  aria-label="סגירת היסטוריה">
+                  <mat-icon>close</mat-icon>
+                </button>
+
+              </div>
+
+              @if (historyLoading) {
+
+                <div class="state-container">
+                  <mat-spinner diameter="32"></mat-spinner>
+                </div>
+
+              } @else if (historyError) {
+
+                <p class="history-message">
+                  {{ historyError }}
+                </p>
+
+              } @else if (history.length === 0) {
+
+                <p class="history-message">
+                  עדיין לא בוצעו שינויי סטטוס בפנייה זו.
+                </p>
+
+              } @else {
+
+                <div class="history-list">
+
+                  @for (item of history; track item.id) {
+
+                    <div class="history-item">
+
+                      <mat-icon>history</mat-icon>
+
+                      <div>
+                        <strong>
+                          {{ getStatusLabel(item.previousStatus) }}
+                          ←
+                          {{ getStatusLabel(item.newStatus) }}
+                        </strong>
+
+                        <p>
+                          {{ item.changedBy }}
+                          ·
+                          {{ item.changedAt | date:'dd/MM/yyyy HH:mm' }}
+                        </p>
+                      </div>
+
+                    </div>
+
+                  }
+
+                </div>
+
+              }
+
+            </mat-card-content>
+          </mat-card>
+
+        </div>
+      </div>
+
+    }
+
+  </main>
+</div>
+

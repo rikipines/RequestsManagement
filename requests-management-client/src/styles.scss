@@ -1,0 +1,37 @@
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  direction: rtl;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+.mat-mdc-paginator,
+.mat-mdc-form-field,
+.mat-mdc-select,
+.mat-mdc-table {
+  direction: rtl;
+}
+/* Background for Angular Material dropdowns */
+:root {
+  --mat-select-panel-background-color: #ffffff;
+}
+
+.cdk-overlay-container .mat-mdc-select-panel {
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+}
